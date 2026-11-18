@@ -19,6 +19,7 @@ add_link_options(-fsanitize=address,undefined)
 add_library(rip_core STATIC
     ${APP}/drivers/encoder.c
     ${APP}/services/crc16.c
+    ${APP}/services/ringbuf.c
 )
 target_include_directories(rip_core PUBLIC ${APP}/drivers ${APP}/control ${APP}/services)
 target_compile_options(rip_core PRIVATE ${RIP_WARNINGS})
@@ -26,7 +27,7 @@ target_link_libraries(rip_core PUBLIC m)
 
 #unit tests
 enable_testing()
-foreach(t test_encoder test_crc16)
+foreach(t test_encoder test_crc16 test_ringbuf)
     add_executable(${t} tests/${t}.c)
     target_include_directories(${t} PRIVATE tests)
     target_link_libraries(${t} PRIVATE rip_core)
