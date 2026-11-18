@@ -22,6 +22,7 @@ add_library(rip_core STATIC
     ${APP}/drivers/button.c
     ${APP}/control/ctrl_filter.c
     ${APP}/services/ringbuf.c
+    ${APP}/services/strfmt.c
 )
 target_include_directories(rip_core PUBLIC ${APP}/drivers ${APP}/control ${APP}/services)
 target_compile_options(rip_core PRIVATE ${RIP_WARNINGS})
@@ -29,7 +30,7 @@ target_link_libraries(rip_core PUBLIC m)
 
 #unit tests
 enable_testing()
-foreach(t test_encoder test_crc16 test_ringbuf test_button test_ctrl_filter)
+foreach(t test_encoder test_crc16 test_ringbuf test_button test_ctrl_filter test_strfmt)
     add_executable(${t} tests/${t}.c)
     target_include_directories(${t} PRIVATE tests)
     target_link_libraries(${t} PRIVATE rip_core)
