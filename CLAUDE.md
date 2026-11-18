@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Firmware for a rotary inverted pendulum (embedded C, STM32-style MCU with a 16-bit hardware timer used as quadrature encoder counter). The project is at an early stage: only `drivers/encoder`, `services/crc16` and `control/ctrl_math.h` exist. `firmware/App/{app,bsp,config}`, `docs/`, `sim/`, `tools/` are empty placeholders.
+Firmware for a rotary inverted pendulum (embedded C, STM32-style MCU with a 16-bit hardware timer used as quadrature encoder counter). The project is at an early stage: only `drivers/encoder`, `drivers/button`, `services/crc16`, `services/ringbuf` and `control/ctrl_math.h` exist. `firmware/App/{app,bsp,config}`, `docs/`, `sim/`, `tools/` are empty placeholders.
 
 ## Layout
 
@@ -14,7 +14,7 @@ Firmware for a rotary inverted pendulum (embedded C, STM32-style MCU with a 16-b
 
 ## Commands
 
-Run from the repo root:
+Run from the repo root. The shell's default cwd is `firmware/App`, not the root: use `cd /home/minhle/dev/rotary_inverted_pendulum && ...` or absolute paths.
 
 ```bash
 cmake -S host -B build/host
@@ -30,12 +30,15 @@ Host builds use `-Wall -Wextra -Wpedantic -Wshadow -Wdouble-promotion -Wfloat-co
 ## Adding code and tests
 
 - New firmware source files must be added to the `rip_core` source list in `host/CMakeLists.txt` (and their directory to `target_include_directories`) or they will not be built or found by tests.
-- New tests: create `host/tests/test_<name>.c` and add `<name>` to the `foreach(t ...)` list in `host/CMakeLists.txt`. Tests use the minimal in-repo framework `host/tests/utest.h` (`UT_CHECK`, `UT_NEAR`, `UT_RUN`, `UT_REPORT`), not an external one.
-- Headers are C, not C++: use `<stdint.h>`/`<stddef.h>`, never `<cstdint>`. Headers have no `extern "C"` guards.
+- New tests: create `host/tests/test_<name>.c` and add `test_<name>` (with the `test_` prefix) to the `foreach(t ...)` list in `host/CMakeLists.txt`; the new `.c` under test must also be in `rip_core`. Tests use the minimal in-repo framework `host/tests/utest.h` (`UT_CHECK`, `UT_NEAR`, `UT_RUN`, `UT_REPORT`), not an external one.
+- Headers are C, not C++: use `<stdint.h>`/`<stddef.h>`/`<stdbool.h>`, never `<cstdint>`. Headers have no `extern "C"` guards. Every header needs a fully closed include guard (`#endif`).
+- The user edits files in the IDE concurrently: re-read a file before `Edit`, and check whether they already wrote a function before adding it (avoids duplicate definitions).
 
 ## Architecture / conventions that span files
 
 - **Encoder** (`drivers/encoder`): extends the 16-bit hardware counter to a 32-bit `count` by accumulating `(int16_t)(uint16_t)(raw - last_raw)`. This relies on the counter moving less than 32768 counts between `encoder_update` calls, so the update must run at a fast, fixed rate. The first `encoder_update` only latches the reference (`primed`). The wiring direction `dir` is applied inside `count`, so `encoder_angle = offset_rad + count * 2π/cpr` (no extra `dir`). `cpr` is counts per revolution in x4 mode. `encoder_rezero` redefines the current position as a given angle without touching `last_raw`.
 - **CRC** (`services/crc16`): CRC-16/CCITT-FALSE (poly 0x1021, init `CRC16_INIT` = 0xFFFF, no reflection, no final XOR), bitwise implementation. Check value for `"123456789"` is `0x29B1`. Any host-side tool talking to the firmware must use the same variant (`crc-ccitt-false` in Python's crcmod). `crc16_update` takes the running CRC, so it can be fed in chunks.
+- **Ring buffer** (`services/ringbuf`): byte SPSC lock-free. Producer writes only `head`, consumer writes only `tail`; both are free-running 16-bit counters (not masked), `used = head - tail`. Size must be a power of 2, ≤ 32768. `ringbuf_write` is all-or-nothing and updates `head` only after the data is copied. `ringbuf_read` reads up to `max` bytes.
+- **Button** (`drivers/button`): integrator debounce (0..`threshold`). Call `button_update` at a fixed rate; emits `PRESSED` when the integrator reaches `threshold`, `RELEASED` when it returns to 0. `threshold == 0` is clamped to 1.
 - **Control math** (`control/ctrl_math.h`): header-only float helpers (`ctrl_wrap_pi` wraps to [-π, π), `ctrl_sign1f` treats 0 as +1). Single-precision `float` is used throughout; the hardware has an FPU-class target in mind, so avoid accidental `double` (the build uses `-Wdouble-promotion`).
 - Angle convention: `encoder_init(..., offset_rad)` takes the angle at power-up (e.g. π for a hanging pendulum). Confirm the project's intended zero/sign convention with the user before relying on it in control code.
