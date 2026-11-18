@@ -1,0 +1,25 @@
+# build outputs
+build/
+firmware/build/
+*.o
+*.elf
+*.bin
+*.hex
+*.map
+
+# simulation outputs (regenerate with the sim/0x scripts)
+sim/out/
+
+# python
+__pycache__/
+*.pyc
+.venv/
+
+# editors
+.vscode/*
+!.vscode/launch.json
+!.vscode/tasks.json
+!.vscode/extensions.json
+.idea/
+.cache/
+

@@ -1,0 +1,13 @@
+# C style for firmware/ and host/  (run: clang-format -i <files>)
+BasedOnStyle: LLVM
+IndentWidth: 4
+ColumnLimit: 120
+BreakBeforeBraces: Linux
+AllowShortFunctionsOnASingleLine: None
+AllowShortIfStatementsOnASingleLine: Never
+AlignConsecutiveAssignments: Consecutive
+AlignConsecutiveDeclarations: Consecutive
+AlignConsecutiveMacros: Consecutive
+PointerAlignment: Right
+SortIncludes: true
+IncludeBlocks: Preserve
