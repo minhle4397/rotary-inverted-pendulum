@@ -4,13 +4,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Firmware for a rotary inverted pendulum (embedded C, STM32-style MCU with a 16-bit hardware timer used as quadrature encoder counter). The project is at an early stage: only `drivers/encoder`, `drivers/button`, `services/crc16`, `services/ringbuf`, `services/strfmt`, `control/ctrl_math.h` and `control/ctrl_filter` exist. `firmware/App/{app,bsp,config}`, `docs/`, `sim/`, `tools/` are empty placeholders.
+Firmware for a rotary inverted pendulum (embedded C, STM32-style MCU with a 16-bit hardware timer used as quadrature encoder counter). The project is at an early stage: only `drivers/encoder`, `drivers/button`, `services/crc16`, `services/ringbuf`, `services/strfmt`, `control/ctrl_math.h` and `control/ctrl_filter` exist, plus `config/board_config.h` (board constants, see below). `firmware/App/{app,bsp}`, `docs/`, `sim/`, `tools/` are empty placeholders.
 
 ## Layout
 
 - `firmware/App/` — hardware-independent application code (drivers, services, control). Must stay free of HAL/register includes so it can be compiled on the PC.
 - `host/` — PC build of the firmware core plus unit tests. `host/CMakeLists.txt` compiles the firmware sources into the static library `rip_core` and links each test against it.
 - `build/` — CMake output (generated; do not edit).
+- `hardware/` — KiCad schematics and PCB, designed on the user's Windows machine. This Ubuntu checkout uses sparse-checkout (`/*` and `!/hardware/`), so the folder is intentionally absent here; do not recreate it, and do not treat its absence as deleted. `git sparse-checkout disable` brings it back.
+- `.github/workflows/ci.yml` — GitHub Actions: on push to `main` and on pull requests, runs the same `cmake` configure/build and `ctest` as the host commands below.
+
+## Git workflow
+
+- Work on a branch (`feat/...`, `fix/...`, `ci/...`, `docs/...`), push it and open a PR into `main`; do not commit directly to `main`. Merge with squash once CI is green.
+- Commit messages use Conventional Commits (`feat(scope): ...`, `fix`, `docs`, `test`, `refactor`, `chore`, `ci`).
+- Keep history linear: use `git pull --rebase`. Only rebase commits that are not pushed yet.
+- Hardware files are normally pushed from Windows. If a push is rejected (`fetch first`), run `git pull --rebase origin main` first.
+- Ask the user before `git push` or any other outward-facing action.
 
 ## Commands
 
@@ -43,4 +53,5 @@ Host builds use `-Wall -Wextra -Wpedantic -Wshadow -Wdouble-promotion -Wfloat-co
 - **String formatting** (`services/strfmt`): printf/strtof-free `sbuf_t` builder (`sb_char/str/i32/f32/hex/pad`) that truncates silently and always keeps the NUL terminator; `str_to_f32` rejects whitespace, trailing junk and leaves `*out` untouched on failure. Known issues (unfixed): `sb_pad(sb, n)` loops forever when `n >= cap`; `sb_f32` overflows `uint32_t` when `|v| * 10^decimals > 4.29e9`; negative values rounding to zero print a space instead of `-`.
 - **Velocity filter** (`control/ctrl_filter`): `ctrl_diff_t` = backward difference + 1st-order low-pass, `w[k] = a*w[k-1] + (1-a)*(x[k]-x[k-1])/Ts`, `a = exp(-2π·fc·Ts)`. Call at a fixed rate equal to `ts`; feed unwrapped angles (never `ctrl_wrap_pi` output); one instance per axis. The first update returns 0 (`primed`); `ctrl_diff_retune` keeps state. No guard for `ts <= 0` or `fc <= 0`. `fc` is the estimator's bandwidth, not the control loop's: choose it ~3-5x above the loop bandwidth.
 - **Control math** (`control/ctrl_math.h`): header-only float helpers (`ctrl_wrap_pi` wraps to [-π, π), `ctrl_sign1f` treats 0 as +1). Single-precision `float` is used throughout; the hardware has an FPU-class target in mind, so avoid accidental `double` (the build uses `-Wdouble-promotion`).
+- **Board config** (`config/board_config.h`): wiring-dependent constants for the STM32F1 board (encoder `dir`, motor `dir`, BTN8982TA current sense, LCD I2C address, safety limits). Control tick is 1 kHz (1000 µs); `*_TICKS` constants are in ticks, button debounce in 10 ms samples. Angle limits are in degrees (`APP_START_WINDOW_DEG`), velocity limits in rad/s: convert from radians before comparing. Items marked `[VERIFY]` (encoder/motor direction, `BOARD_IS_KILIS`, `BOARD_IS_SWAP`, LCD address) are unverified on real hardware. `rip_params_autogen.h` (e.g. `RIP_S_THETA_TRIP`) is referenced but does not exist yet. Nothing uses `APP_START_WINDOW_DEG` yet.
 - Angle convention: `encoder_init(..., offset_rad)` takes the angle at power-up (e.g. π for a hanging pendulum). Confirm the project's intended zero/sign convention with the user before relying on it in control code.
