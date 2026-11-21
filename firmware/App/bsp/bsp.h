@@ -42,6 +42,11 @@ void bsp_bridge_enable(bool enable);
 bool bsp_bridge_inhibit_sense(void);
 
 // HMI
+bool bsp_btn_start_raw(void); // true = pressed (active low on PCB)
+bool bsp_btn_stop_raw(void);
+void bsp_led_set(bool on);
+bool bsp_i2c_write(uint8_t addr7, const uint8_t *buf, uint16_t len);
+
 // Non-blocking DMA transmit. buf must stay valid until bsp_uart_tx_busy() is false
 bool bsp_uart_tx(const uint8_t *buf, uint16_t len);
 bool bsp_uart_tx_busy(void);
