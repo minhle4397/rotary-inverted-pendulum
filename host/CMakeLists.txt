@@ -23,14 +23,21 @@ add_library(rip_core STATIC
     ${APP}/control/ctrl_filter.c
     ${APP}/services/ringbuf.c
     ${APP}/services/strfmt.c
+    ${APP}/services/safety.c
 )
-target_include_directories(rip_core PUBLIC ${APP}/drivers ${APP}/control ${APP}/services)
+target_include_directories(rip_core PUBLIC
+    ${APP}/config ${APP}/bsp ${APP}/drivers ${APP}/control ${APP}/services)
 target_compile_options(rip_core PRIVATE ${RIP_WARNINGS})
 target_link_libraries(rip_core PUBLIC m)
 
+#fake BSP for tests (link only into tests that need it)
+add_library(bsp_fake STATIC tests/bsp_fake.c)
+target_include_directories(bsp_fake PUBLIC tests ${APP}/bsp)
+target_compile_options(bsp_fake PRIVATE ${RIP_WARNINGS})
+
 #unit tests
 enable_testing()
-foreach(t test_encoder test_crc16 test_ringbuf test_button test_ctrl_filter test_strfmt)
+foreach(t test_encoder test_crc16 test_ringbuf test_button test_ctrl_filter test_strfmt test_safety)
     add_executable(${t} tests/${t}.c)
     target_include_directories(${t} PRIVATE tests)
     target_link_libraries(${t} PRIVATE rip_core)
