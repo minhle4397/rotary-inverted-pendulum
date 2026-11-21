@@ -23,6 +23,7 @@ add_library(rip_core STATIC
     ${APP}/control/ctrl_filter.c
     ${APP}/services/ringbuf.c
     ${APP}/services/strfmt.c
+    ${APP}/drivers/motor.c
     ${APP}/services/safety.c
 )
 target_include_directories(rip_core PUBLIC
@@ -37,9 +38,12 @@ target_compile_options(bsp_fake PRIVATE ${RIP_WARNINGS})
 
 #unit tests
 enable_testing()
-foreach(t test_encoder test_crc16 test_ringbuf test_button test_ctrl_filter test_strfmt test_safety)
+foreach(t test_encoder test_crc16 test_ringbuf test_button test_ctrl_filter test_strfmt test_safety test_motor_current)
     add_executable(${t} tests/${t}.c)
     target_include_directories(${t} PRIVATE tests)
     target_link_libraries(${t} PRIVATE rip_core)
     add_test(NAME ${t} COMMAND ${t})
 endforeach()
+
+#tests that need the fake BSP
+target_link_libraries(test_motor_current PRIVATE bsp_fake)
