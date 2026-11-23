@@ -26,6 +26,7 @@ add_library(rip_core STATIC
     ${APP}/drivers/motor.c
     ${APP}/drivers/current_sense.c
     ${APP}/services/safety.c
+    ${APP}/services/telemetry.c
 )
 target_include_directories(rip_core PUBLIC
     ${APP}/config ${APP}/bsp ${APP}/drivers ${APP}/control ${APP}/services)
@@ -39,7 +40,7 @@ target_compile_options(bsp_fake PRIVATE ${RIP_WARNINGS})
 
 #unit tests
 enable_testing()
-foreach(t test_encoder test_crc16 test_ringbuf test_button test_ctrl_filter test_strfmt test_safety test_motor_current)
+foreach(t test_encoder test_crc16 test_ringbuf test_button test_ctrl_filter test_strfmt test_safety test_motor_current test_telemetry)
     add_executable(${t} tests/${t}.c)
     target_include_directories(${t} PRIVATE tests)
     target_link_libraries(${t} PRIVATE rip_core)
@@ -48,3 +49,4 @@ endforeach()
 
 #tests that need the fake BSP
 target_link_libraries(test_motor_current PRIVATE bsp_fake)
+target_link_libraries(test_telemetry PRIVATE bsp_fake)
