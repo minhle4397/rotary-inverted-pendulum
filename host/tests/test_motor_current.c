@@ -1,9 +1,10 @@
 /**
  * @file    test_motor_current.c
- * @brief   Motor driver: sign-magnitude PWM and ADC trigger placement (uses bsp_fake).
+ * @brief   Motor driver (sign-magnitude PWM, ADC trigger) and current-sense conversion (uses bsp_fake).
  */
 #include "board_config.h"
 #include "bsp_fake.h"
+#include "current_sense.h"
 #include "motor.h"
 #include "utest.h"
 
@@ -122,6 +123,84 @@ static void test_disable_forces_zero(void)
     UT_CHECK(g_fake.pwm_a == 0u);
 }
 
+/* ---- current_sense ---- */
+
+static void cs_setup(current_sense_t *cs, motor_t *m)
+{
+    fake_reset();
+    motor_init(m, VBUS, +1);
+    motor_enable(m, true);
+    current_sense_init(cs, BOARD_IS_R_OHM, BOARD_IS_KILIS, BOARD_ADC_VREF_V, 4095u, BOARD_IS_FAULT_RAW,
+                       BOARD_IS_MIN_DUTY);
+}
+
+static void test_cs_scale(void)
+{
+    current_sense_t cs;
+    motor_t         m;
+    cs_setup(&cs, &m);
+    UT_NEAR(cs.amps_per_lsb, 4.76e-3, 1e-5);
+}
+
+static void test_cs_positive_uses_half_a(void)
+{
+    current_sense_t cs;
+    motor_t         m;
+    cs_setup(&cs, &m);
+    motor_set_voltage(&m, 6.0f);
+    const current_meas_t r = current_sense_update(&cs, 100u, 2000u, &m);
+    UT_CHECK(r.valid && !r.driver_fault);
+    UT_NEAR(r.amps, 100.0 * cs.amps_per_lsb, 1e-5);
+}
+
+static void test_cs_negative_uses_half_b_and_sign(void)
+{
+    current_sense_t cs;
+    motor_t         m;
+    cs_setup(&cs, &m);
+    motor_set_voltage(&m, -6.0f);
+    const current_meas_t r = current_sense_update(&cs, 2000u, 100u, &m);
+    UT_CHECK(r.valid && !r.driver_fault);
+    UT_NEAR(r.amps, -100.0 * cs.amps_per_lsb, 1e-5);
+}
+
+static void test_cs_low_duty_invalid(void)
+{
+    current_sense_t cs;
+    motor_t         m;
+    cs_setup(&cs, &m);
+    motor_set_voltage(&m, 0.5f); /* duty ~4 % < 10 % */
+    const current_meas_t r = current_sense_update(&cs, 100u, 0u, &m);
+    UT_CHECK(!r.valid);
+    UT_NEAR(r.amps, 0.0, 1e-9);
+}
+
+static void test_cs_disabled_invalid(void)
+{
+    current_sense_t cs;
+    motor_t         m;
+    cs_setup(&cs, &m);
+    motor_set_voltage(&m, 6.0f);
+    motor_enable(&m, false);
+    const current_meas_t r = current_sense_update(&cs, 100u, 0u, &m);
+    UT_CHECK(!r.valid);
+}
+
+static void test_cs_fault_on_either_channel(void)
+{
+    current_sense_t cs;
+    motor_t         m;
+    cs_setup(&cs, &m);
+    motor_set_voltage(&m, 6.0f);
+    current_meas_t r = current_sense_update(&cs, 100u, BOARD_IS_FAULT_RAW, &m); /* idle half faulted */
+    UT_CHECK(r.driver_fault && !r.valid);
+    UT_NEAR(r.amps, 0.0, 1e-9);
+    r = current_sense_update(&cs, BOARD_IS_FAULT_RAW - 1u, 0u, &m);
+    UT_CHECK(!r.driver_fault && r.valid);
+    r = current_sense_update(&cs, BOARD_IS_FAULT_RAW, 0u, &m);
+    UT_CHECK(r.driver_fault);
+}
+
 int main(void)
 {
     UT_RUN(test_init_safe);
@@ -133,5 +212,11 @@ int main(void)
     UT_RUN(test_adc_trigger_mid_on_time);
     UT_RUN(test_adc_trigger_clamped_to_min);
     UT_RUN(test_disable_forces_zero);
+    UT_RUN(test_cs_scale);
+    UT_RUN(test_cs_positive_uses_half_a);
+    UT_RUN(test_cs_negative_uses_half_b_and_sign);
+    UT_RUN(test_cs_low_duty_invalid);
+    UT_RUN(test_cs_disabled_invalid);
+    UT_RUN(test_cs_fault_on_either_channel);
     UT_REPORT();
 }

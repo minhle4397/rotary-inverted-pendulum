@@ -24,6 +24,7 @@ add_library(rip_core STATIC
     ${APP}/services/ringbuf.c
     ${APP}/services/strfmt.c
     ${APP}/drivers/motor.c
+    ${APP}/drivers/current_sense.c
     ${APP}/services/safety.c
 )
 target_include_directories(rip_core PUBLIC
